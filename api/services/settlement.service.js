@@ -227,7 +227,47 @@ class SettlementService {
         console.log(`⚠️  No amount found in VCourt challan structure for: ${source}`);
       }
       
-      // Method 4: Check for amount in various possible fields (generic fallback)
+      // Method 4: Delhi Police Traffic specific extraction
+      if (source === 'traffic_notice') {
+        console.log(`🔍 Extracting amount for Delhi Police Traffic challan: ${source}`);
+        
+        // Method 4a: Check penaltyAmount field (primary field for Delhi Police)
+        if (challan.penaltyAmount) {
+          const value = challan.penaltyAmount;
+          if (typeof value === 'number') {
+            console.log(`💰 Amount extracted from Delhi Police penaltyAmount field: ₹${value} (${source})`);
+            return value;
+          } else if (typeof value === 'string') {
+            const extractedAmount = parseFloat(value.replace(/[^\d.]/g, ''));
+            if (!isNaN(extractedAmount) && extractedAmount > 0) {
+              console.log(`💰 Amount extracted from Delhi Police penaltyAmount string field: ₹${extractedAmount} (${source})`);
+              return extractedAmount;
+            }
+          }
+        }
+        
+        // Method 4b: Check other possible amount fields for Delhi Police
+        const delhiAmountFields = ['amount', 'fine', 'penalty', 'challanAmount', 'totalAmount', 'fineAmount'];
+        for (const field of delhiAmountFields) {
+          if (challan[field]) {
+            const value = challan[field];
+            if (typeof value === 'number') {
+              console.log(`💰 Amount extracted from Delhi Police ${field} field: ₹${value} (${source})`);
+              return value;
+            } else if (typeof value === 'string') {
+              const extractedAmount = parseFloat(value.replace(/[^\d.]/g, ''));
+              if (!isNaN(extractedAmount) && extractedAmount > 0) {
+                console.log(`💰 Amount extracted from Delhi Police ${field} string field: ₹${extractedAmount} (${source})`);
+                return extractedAmount;
+              }
+            }
+          }
+        }
+        
+        console.log(`⚠️  No amount found in Delhi Police challan structure for: ${source}`);
+      }
+      
+      // Method 5: Check for amount in various possible fields (generic fallback)
       const possibleAmountFields = [
         'fine',
         'penalty',
@@ -244,7 +284,7 @@ class SettlementService {
         }
       }
       
-      // Method 5: Check detailedInfo for any amount-like fields
+      // Method 6: Check detailedInfo for any amount-like fields
       if (detailedInfo && detailedInfo.caseDetails) {
         for (const [key, value] of Object.entries(detailedInfo.caseDetails)) {
           if (typeof value === 'string' && value.includes('.') && !isNaN(parseFloat(value))) {

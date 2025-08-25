@@ -1884,10 +1884,16 @@ exports.calculateUniqueChallans = async (challanId) => {
     // From Delhi Police Traffic (Priority 3)
     if (challanRecord.traffic_notice_json && Array.isArray(challanRecord.traffic_notice_json)) {
       challanRecord.traffic_notice_json.forEach(challan => {
+        // Extract amount for Delhi Police challans
+        const extractedAmount = settlementService.extractAmountFromChallan(challan);
+        if (extractedAmount) {
+          console.log(`💰 Delhi Police amount extracted: ₹${extractedAmount} for challan ${challan.noticeNo || challan.challanNo}`);
+        }
         allChallans.push({
           ...challan,
           source: 'traffic_notice',
-          priority: 3
+          priority: 3,
+          amount: extractedAmount || challan.penaltyAmount || challan.amount // Use extracted amount or fallback to penaltyAmount
         });
       });
     }
