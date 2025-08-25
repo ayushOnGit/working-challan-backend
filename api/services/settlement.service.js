@@ -493,7 +493,7 @@ class SettlementService {
         }
       }
       
-      // Match "All" rules (like DL Challan All) or rules without cutoff logic
+      // Match rules without cutoff logic (like DL MParivahan with no year/amount restrictions)
       if ((!rule.challan_year_cutoff && !rule.amount_cutoff) || 
           (!rule.year_cutoff_logic && !rule.amount_cutoff_logic)) {
         console.log(`    ✅ Rule matched: ${rule.rule_name} (no year/amount cutoff or no cutoff logic specified)`);
@@ -505,46 +505,7 @@ class SettlementService {
     });
   }
   
-  /**
-   * Parse cutoff logic from rule name (≤ or >)
-   * @param {String} ruleName - Rule name to parse
-   * @param {String} type - Type of cutoff ('year' or 'amount')
-   * @returns {String} - Cutoff logic ('≤', '>', or null for default)
-   */
-  parseCutoffLogic(ruleName, type) {
-    try {
-      const ruleNameUpper = ruleName.toUpperCase();
-      
-      if (type === 'year') {
-        // Look for ANY year cutoff patterns using regex
-        // Pattern: ≤ followed by 4 digits (any year)
-        if (/\≤\d{4}/.test(ruleNameUpper)) {
-          return '≤';
-        } 
-        // Pattern: > followed by 4 digits (any year)
-        else if (/\>\d{4}/.test(ruleNameUpper)) {
-          return '>';
-        }
-      } else if (type === 'amount') {
-        // Look for ANY amount cutoff patterns using regex
-        // Pattern: ≤ followed by digits (any amount)
-        if (/\≤\d+/.test(ruleNameUpper)) {
-          return '≤';
-        } 
-        // Pattern: > followed by digits (any amount)
-        else if (/\>\d+/.test(ruleNameUpper)) {
-          return '>';
-        }
-      }
-      
-      // Default: no specific cutoff logic found
-      return null;
-      
-    } catch (error) {
-      console.error(`❌ Error parsing cutoff logic from rule name: ${ruleName}`, error);
-      return null;
-    }
-  }
+
 
   /**
    * Determine M Parivahan/CarInfo region from challan number
