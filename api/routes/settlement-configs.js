@@ -2,9 +2,13 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const router = express.Router();
 const prisma = new PrismaClient();
+const { authenticateToken, requirePermission } = require('../middlewares/auth.middleware');
+
+// Apply authentication to all routes
+router.use(authenticateToken);
 
 // GET /api/settlement-configs - Get all settlement configurations
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('settlement_config', 'read'), async (req, res) => {
   try {
     const configs = await prisma.settlement_configs.findMany({
       orderBy: [
@@ -21,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/settlement-configs/:id - Get settlement configuration by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission('settlement_config', 'read'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const config = await prisma.settlement_configs.findUnique({
@@ -40,7 +44,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/settlement-configs - Create new settlement configuration
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('settlement_config', 'write'), async (req, res) => {
   try {
     const {
       rule_name,
@@ -119,7 +123,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/settlement-configs/:id - Update settlement configuration
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('settlement_config', 'write'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const {
@@ -173,7 +177,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/settlement-configs/clear-all - Clear all settlement configurations
-router.delete('/clear-all', async (req, res) => {
+router.delete('/clear-all', requirePermission('settlement_config', 'delete'), async (req, res) => {
   try {
     const deleteCount = await prisma.settlement_configs.deleteMany({});
     
@@ -190,7 +194,7 @@ router.delete('/clear-all', async (req, res) => {
 });
 
 // DELETE /api/settlement-configs/:id - Delete settlement configuration
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('settlement_config', 'delete'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -210,7 +214,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PATCH /api/settlement-configs/:id/toggle - Toggle active status
-router.patch('/:id/toggle', async (req, res) => {
+router.patch('/:id/toggle', requirePermission('settlement_config', 'write'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { is_active } = req.body;
