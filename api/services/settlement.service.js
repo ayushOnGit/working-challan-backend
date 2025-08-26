@@ -307,6 +307,98 @@ class SettlementService {
   }
 
   /**
+   * Normalize date format to ensure consistent parsing
+   * @param {String} dateString - Date string in various formats
+   * @returns {String} - Normalized date string in YYYY-MM-DD format
+   */
+  normalizeDate(dateString) {
+    if (!dateString) return null;
+    
+    try {
+      // Handle DD-MM-YYYY format (VCourt challans)
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const parts = dateString.split('-');
+        if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+          // DD-MM-YYYY format detected
+          const [day, month, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+      }
+      
+      // Handle DD/MM/YYYY format
+      if (dateString.includes('/') && dateString.split('/').length === 3) {
+        const parts = dateString.split('/');
+        if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+          // DD/MM/YYYY format detected
+          const [day, month, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+      }
+      
+      // Handle YYYY-MM-DD format (Delhi Police) - already correct
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return dateString.split(' ')[0]; // Remove time part if present
+      }
+      
+      // Handle MM/DD/YYYY format (American format)
+      if (dateString.includes('/') && dateString.split('/').length === 3) {
+        const parts = dateString.split('/');
+        if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+          // MM/DD/YYYY format detected
+          const [month, day, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+      }
+      
+      // If no pattern matches, try to parse with Date constructor
+      const parsedDate = new Date(dateString);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toISOString().split('T')[0];
+      }
+      
+      console.log(`⚠️  Could not normalize date format: ${dateString}`);
+      return null;
+      
+    } catch (error) {
+      console.error(`❌ Error normalizing date: ${dateString}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract year from date string with proper format handling
+   * @param {String} dateString - Date string in various formats
+   * @returns {Number} - Year as number
+   */
+  extractYearFromDate(dateString) {
+    if (!dateString) return new Date().getFullYear();
+    
+    try {
+      // First normalize the date
+      const normalizedDate = this.normalizeDate(dateString);
+      if (!normalizedDate) {
+        console.log(`⚠️  Could not extract year from date: ${dateString}, using current year`);
+        return new Date().getFullYear();
+      }
+      
+      // Parse the normalized date
+      const date = new Date(normalizedDate);
+      if (isNaN(date.getTime())) {
+        console.log(`⚠️  Invalid normalized date: ${normalizedDate}, using current year`);
+        return new Date().getFullYear();
+      }
+      
+      const year = date.getFullYear();
+      console.log(`📅 Date normalized: ${dateString} → ${normalizedDate} → Year: ${year}`);
+      return year;
+      
+    } catch (error) {
+      console.error(`❌ Error extracting year from date: ${dateString}`, error);
+      return new Date().getFullYear();
+    }
+  }
+
+  /**
    * Calculate settlement for a single challan
    * @param {Object} challan - Single challan object
    * @param {Array} rules - Array of settlement rules
@@ -346,6 +438,20 @@ class SettlementService {
         // Calculate settlement amount
         const settlementAmount = this.calculateSettlementAmount(amount, matchingRule.settlement_percentage);
         
+        // 🎯 ENHANCED LOGGING: Show rule application details
+        console.log(`\n🎯 SETTLEMENT RULE APPLIED:`);
+        console.log(`   Challan: ${challanNumber || noticeNo} (${source})`);
+        console.log(`   Amount: ₹${amount}`);
+        console.log(`   Date: ${date}`);
+        console.log(`   Rule: ${matchingRule.rule_name}`);
+        console.log(`   Source Type: ${matchingRule.source_type}`);
+        console.log(`   Region: ${matchingRule.region}`);
+        console.log(`   Year Cutoff: ${matchingRule.challan_year_cutoff} ${matchingRule.year_cutoff_logic || ''}`);
+        console.log(`   Amount Cutoff: ₹${matchingRule.amount_cutoff} ${matchingRule.amount_cutoff_logic || ''}`);
+        console.log(`   Settlement %: ${matchingRule.settlement_percentage}%`);
+        console.log(`   Settlement Amount: ₹${settlementAmount}`);
+        console.log(`   Savings: ₹${amount - settlementAmount}`);
+        
         // Add settlement data to challan
         return {
           ...challan,
@@ -369,7 +475,13 @@ class SettlementService {
         };
       } else {
         // No matching rule found - use original amount
-        console.log(`⚠️  No settlement rule found for challan: ${challanNumber || noticeNo} (${source})`);
+        console.log(`\n⚠️  NO SETTLEMENT RULE FOUND:`);
+        console.log(`   Challan: ${challanNumber || noticeNo} (${source})`);
+        console.log(`   Amount: ₹${amount}`);
+        console.log(`   Date: ${date}`);
+        console.log(`   Source Type: ${challan.source}`);
+        console.log(`   Available Rules: ${rules.filter(r => r.source_type === (challan.source === 'vcourt_notice' || challan.source === 'vcourt_traffic' ? 'vcourt' : challan.source === 'traffic_notice' ? 'delhi_police' : challan.source)).map(r => r.rule_name).join(', ')}`);
+        console.log(`   Result: Using original amount (100% settlement)`);
         
         return {
           ...challan,
@@ -404,8 +516,8 @@ class SettlementService {
     const { source, date } = challan;
     const amount = extractedAmount || challan.amount; // Use extracted amount if provided, fallback to challan.amount
     
-    // Extract year from date
-    const challanYear = date ? new Date(date).getFullYear() : new Date().getFullYear();
+    // 🎯 FIXED: Use normalized date extraction for consistent year parsing
+    const challanYear = this.extractYearFromDate(date);
     
     // Map source to database source_type
     // IMPORTANT: ACKO JSON contains CarInfo API data, so apply MParivahan logic
@@ -421,6 +533,7 @@ class SettlementService {
     
     // Find matching rule
     console.log(`🔍 Looking for rule: source=${dbSourceType}, region=${challan.region || 'unknown'}, year=${challanYear}, amount=${amount}`);
+    console.log(`📅 Original date: ${date} → Normalized year: ${challanYear}`);
     
     return rules.find(rule => {
       console.log(`  📋 Checking rule: ${rule.rule_name} (source=${rule.source_type}, region=${rule.region}, year_cutoff=${rule.challan_year_cutoff}, amount_cutoff=${rule.amount_cutoff})`);
@@ -455,6 +568,10 @@ class SettlementService {
         }
       }
       
+      // Track if all conditions are met
+      let yearConditionMet = true;
+      let amountConditionMet = true;
+      
       // Match year cutoff logic (applies to all sources: VCourt, Delhi Police, MParivahan)
       if (rule.challan_year_cutoff && rule.year_cutoff_logic) {
         console.log(`    📅 Checking year cutoff: ${rule.year_cutoff_logic}${rule.challan_year_cutoff}, challan year: ${challanYear}`);
@@ -463,13 +580,17 @@ class SettlementService {
           // Rule for challans ≤ year_cutoff (e.g., ≤2023, ≤2024, ≤2025, etc.)
           if (challanYear > rule.challan_year_cutoff) {
             console.log(`    ❌ Year cutoff failed: ${challanYear} > ${rule.challan_year_cutoff} (≤${rule.challan_year_cutoff} rule)`);
-            return false;
+            yearConditionMet = false;
+          } else {
+            console.log(`    ✅ Year cutoff passed: ${challanYear} ≤ ${rule.challan_year_cutoff}`);
           }
         } else if (rule.year_cutoff_logic === '>') {
           // Rule for challans > year_cutoff (e.g., >2023, >2024, >2025, etc.)
           if (challanYear <= rule.challan_year_cutoff) {
             console.log(`    ❌ Year cutoff failed: ${challanYear} <= ${rule.challan_year_cutoff} (>${rule.challan_year_cutoff} rule)`);
-            return false;
+            yearConditionMet = false;
+          } else {
+            console.log(`    ✅ Year cutoff passed: ${challanYear} > ${rule.challan_year_cutoff}`);
           }
         }
       }
@@ -482,26 +603,29 @@ class SettlementService {
           // Rule for challans ≤ amount_cutoff (e.g., ≤1000, ≤500, ≤2000, etc.)
           if (amount > rule.amount_cutoff) {
             console.log(`    ❌ Amount cutoff failed: ${amount} > ${rule.amount_cutoff} (≤${rule.amount_cutoff} rule)`);
-            return false;
+            amountConditionMet = false;
+          } else {
+            console.log(`    ✅ Amount cutoff passed: ${amount} ≤ ${rule.amount_cutoff}`);
           }
         } else if (rule.amount_cutoff_logic === '>') {
           // Rule for challans > amount_cutoff (e.g., >1000, >500, >2000, etc.)
           if (amount <= rule.amount_cutoff) {
             console.log(`    ❌ Amount cutoff failed: ${amount} <= ${rule.amount_cutoff} (>${rule.amount_cutoff} rule)`);
-            return false;
+            amountConditionMet = false;
+          } else {
+            console.log(`    ✅ Amount cutoff passed: ${amount} > ${rule.amount_cutoff}`);
           }
         }
       }
       
-      // Match rules without cutoff logic (like DL MParivahan with no year/amount restrictions)
-      if ((!rule.challan_year_cutoff && !rule.amount_cutoff) || 
-          (!rule.year_cutoff_logic && !rule.amount_cutoff_logic)) {
-        console.log(`    ✅ Rule matched: ${rule.rule_name} (no year/amount cutoff or no cutoff logic specified)`);
+      // 🎯 FIXED: Only return true if ALL conditions are met
+      if (yearConditionMet && amountConditionMet) {
+        console.log(`    ✅ Rule matched: ${rule.rule_name} (all conditions satisfied)`);
         return true;
+      } else {
+        console.log(`    ❌ Rule not matched: ${rule.rule_name} (conditions not satisfied - year: ${yearConditionMet}, amount: ${amountConditionMet})`);
+        return false;
       }
-      
-      console.log(`    ✅ Rule matched: ${rule.rule_name}`);
-      return true;
     });
   }
   
