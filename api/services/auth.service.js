@@ -1,10 +1,19 @@
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
 
 const prisma = new PrismaClient();
 
 class AuthService {
+  
+  constructor() {
+    // Initialize Google OAuth client
+    this.googleClient = new OAuth2Client(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+  }
   
   /**
    * Validate Gmail domain for company users
@@ -21,13 +30,49 @@ class AuthService {
   }
 
   /**
-   * Create or update company user
-   * @param {Object} userData - User data
+   * Verify Google ID token and extract user information
+   * @param {string} idToken - Google ID token from frontend
+   * @returns {Object} - Verified user data from Google
+   */
+  async verifyGoogleToken(idToken) {
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      
+      const payload = ticket.getPayload();
+      
+      // Verify the email domain
+      if (!this.validateCompanyEmail(payload.email)) {
+        throw new Error('Only @vutto.in email addresses are allowed');
+      }
+      
+      // Verify email is verified by Google
+      if (!payload.email_verified) {
+        throw new Error('Email address not verified by Google');
+      }
+      
+      return {
+        email: payload.email,
+        name: payload.name || payload.email.split('@')[0],
+        picture: payload.picture,
+        googleId: payload.sub
+      };
+    } catch (error) {
+      console.error('Google token verification failed:', error);
+      throw new Error('Invalid Google authentication token');
+    }
+  }
+
+  /**
+   * Create or update company user with Google OAuth
+   * @param {Object} googleUserData - Verified user data from Google
    * @returns {Object} - Created/updated user
    */
-  async createOrUpdateCompanyUser(userData) {
+  async createOrUpdateCompanyUserWithGoogle(googleUserData) {
     try {
-      const { email, name, roleName = 'employee' } = userData;
+      const { email, name, picture, googleId } = googleUserData;
       
       // Validate company email
       if (!this.validateCompanyEmail(email)) {
@@ -36,15 +81,15 @@ class AuthService {
       
       // Get or create default role
       let role = await prisma.company_roles.findFirst({
-        where: { name: roleName, is_active: true }
+        where: { name: 'employee', is_active: true }
       });
       
       if (!role) {
         // Create default employee role if it doesn't exist
         role = await prisma.company_roles.create({
           data: {
-            name: roleName,
-            description: `Default ${roleName} role for company users`
+            name: 'employee',
+            description: 'Default employee role for company users'
           }
         });
       }
@@ -54,7 +99,6 @@ class AuthService {
         where: { email: email.toLowerCase() },
         update: {
           name,
-          role_id: role.id,
           last_login: new Date(),
           updated_at: new Date()
         },
@@ -67,13 +111,67 @@ class AuthService {
       
       return user;
     } catch (error) {
-      console.error('Error creating/updating company user:', error);
+      console.error('Error creating/updating company user with Google:', error);
       throw error;
     }
   }
 
   /**
-   * Authenticate company user
+   * Company user login with Google OAuth
+   * @param {string} idToken - Google ID token
+   * @returns {Object} - User with permissions
+   */
+  async authenticateCompanyUserWithGoogle(idToken) {
+    try {
+      // Verify Google token
+      const googleUserData = await this.verifyGoogleToken(idToken);
+      
+      // Create or update user
+      const user = await this.createOrUpdateCompanyUserWithGoogle(googleUserData);
+      
+      // Get user with role and permissions
+      const userWithPermissions = await prisma.company_users.findFirst({
+        where: { 
+          id: user.id,
+          is_active: true
+        },
+        include: {
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true
+                }
+              }
+            }
+          },
+          user_permissions: {
+            include: {
+              permission: true
+            }
+          }
+        }
+      });
+      
+      if (!userWithPermissions) {
+        throw new Error('User not found or inactive');
+      }
+      
+      // Update last login
+      await prisma.company_users.update({
+        where: { id: user.id },
+        data: { last_login: new Date() }
+      });
+      
+      return userWithPermissions;
+    } catch (error) {
+      console.error('Error authenticating company user with Google:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy method for backward compatibility
    * @param {string} email - User email
    * @returns {Object} - User with permissions
    */
@@ -121,6 +219,58 @@ class AuthService {
       return user;
     } catch (error) {
       console.error('Error authenticating company user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create or update company user (legacy method)
+   * @param {Object} userData - User data
+   * @returns {Object} - Created/updated user
+   */
+  async createOrUpdateCompanyUser(userData) {
+    try {
+      const { email, name, roleName = 'employee' } = userData;
+      
+      // Validate company email
+      if (!this.validateCompanyEmail(email)) {
+        throw new Error('Only @vutto.in email addresses are allowed');
+      }
+      
+      // Get or create default role
+      let role = await prisma.company_roles.findFirst({
+        where: { name: roleName, is_active: true }
+      });
+      
+      if (!role) {
+        // Create default employee role if it doesn't exist
+        role = await prisma.company_roles.create({
+          data: {
+            name: roleName,
+            description: `Default ${roleName} role for company users`
+          }
+        });
+      }
+      
+      // Create or update user
+      const user = await prisma.company_users.upsert({
+        where: { email: email.toLowerCase() },
+        update: {
+          name,
+          role_id: role.id,
+          last_login: new Date(),
+          updated_at: new Date()
+        },
+        create: {
+          email: email.toLowerCase(),
+          name,
+          role_id: role.id
+        }
+      });
+      
+      return user;
+    } catch (error) {
+      console.error('Error creating/updating company user:', error);
       throw error;
     }
   }

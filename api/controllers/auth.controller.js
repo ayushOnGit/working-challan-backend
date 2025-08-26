@@ -4,7 +4,59 @@ const { APIError } = require('../utils/APIError');
 class AuthController {
   
   /**
-   * Company user login
+   * Company user login with Google OAuth
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async googleLogin(req, res) {
+    try {
+      const { idToken } = req.body;
+      
+      if (!idToken) {
+        throw new APIError('Google ID token is required', 400);
+      }
+      
+      // Authenticate user with Google OAuth
+      const user = await AuthService.authenticateCompanyUserWithGoogle(idToken);
+      
+      // Generate JWT token
+      const token = AuthService.generateToken(user);
+      
+      // Return user info and token
+      res.status(200).json({
+        success: true,
+        message: 'Google login successful',
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role?.name || 'employee',
+            permissions: AuthService.extractPermissions(user)
+          },
+          token
+        }
+      });
+      
+    } catch (error) {
+      console.error('Google login error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: error.message || 'Google authentication failed'
+        });
+      }
+    }
+  }
+  
+  /**
+   * Company user login (legacy method)
    * @param {Object} req - Express request object
    * @param {Object} res - Express response object
    */

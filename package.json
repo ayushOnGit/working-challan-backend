@@ -16,6 +16,7 @@
   "author": "apoorv99goyal@gmail.com",
   "dependencies": {
     "@prisma/client": "^5.17.0",
+    "@react-oauth/google": "^0.12.2",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.7.3",
     "axios-cookiejar-support": "^5.0.2",
@@ -31,6 +32,7 @@
     "express": "^4.17.1",
     "express-validation": "^1.0.2",
     "express-winston": "^4.1.0",
+    "google-auth-library": "^10.3.0",
     "helmet": "^4.4.1",
     "http-status": "^1.5.0",
     "husky": "^5.0.9",
