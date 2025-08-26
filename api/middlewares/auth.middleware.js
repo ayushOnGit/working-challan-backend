@@ -1,5 +1,5 @@
 const AuthService = require('../services/auth.service');
-const { APIError } = require('../utils/APIError');
+const APIError = require('../utils/APIError');
 
 /**
  * Authentication middleware to verify JWT token
@@ -13,7 +13,7 @@ const authenticateToken = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
     if (!token) {
-      throw new APIError('Access token required', 401);
+      throw new APIError({ message: 'Access token required', status: 401 });
     }
     
     // Verify token
@@ -23,7 +23,7 @@ const authenticateToken = async (req, res, next) => {
     const user = await AuthService.authenticateCompanyUser(decoded.email);
     
     if (!user) {
-      throw new APIError('User not found or inactive', 401);
+      throw new APIError({ message: 'User not found or inactive', status: 401 });
     }
     
     // Add user info to request
@@ -41,7 +41,7 @@ const authenticateToken = async (req, res, next) => {
     console.error('Authentication error:', error);
     
     if (error instanceof APIError) {
-      res.status(error.statusCode).json({
+      res.status(error.status).json({
         success: false,
         message: error.message
       });
@@ -66,13 +66,13 @@ const requirePermission = (resource, action) => {
       const user = req.user;
       
       if (!user) {
-        throw new APIError('User not authenticated', 401);
+        throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
       const hasPermission = AuthService.hasPermission(user, resource, action);
       
       if (!hasPermission) {
-        throw new APIError(`Insufficient permissions. Required: ${resource}:${action}`, 403);
+        throw new APIError({ message: `Insufficient permissions. Required: ${resource}:${action}`, status: 403 });
       }
       
       next();
@@ -81,7 +81,7 @@ const requirePermission = (resource, action) => {
       console.error('Permission check error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
@@ -106,7 +106,7 @@ const requireRole = (allowedRoles) => {
       const user = req.user;
       
       if (!user) {
-        throw new APIError('User not authenticated', 401);
+        throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
       if (!Array.isArray(allowedRoles)) {
@@ -114,7 +114,7 @@ const requireRole = (allowedRoles) => {
       }
       
       if (!allowedRoles.includes(user.role)) {
-        throw new APIError(`Access denied. Required roles: ${allowedRoles.join(', ')}`, 403);
+        throw new APIError({ message: `Access denied. Required roles: ${allowedRoles.join(', ')}`, status: 403 });
       }
       
       next();
@@ -123,7 +123,7 @@ const requireRole = (allowedRoles) => {
       console.error('Role check error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });

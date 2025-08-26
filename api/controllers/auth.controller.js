@@ -1,5 +1,5 @@
 const AuthService = require('../services/auth.service');
-const { APIError } = require('../utils/APIError');
+const APIError = require('../utils/APIError');
 
 class AuthController {
   
@@ -13,7 +13,7 @@ class AuthController {
       const { idToken } = req.body;
       
       if (!idToken) {
-        throw new APIError('Google ID token is required', 400);
+        throw new APIError({ message: 'Google ID token is required', status: 400 });
       }
       
       // Authenticate user with Google OAuth
@@ -42,7 +42,7 @@ class AuthController {
       console.error('Google login error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
@@ -65,12 +65,12 @@ class AuthController {
       const { email, name } = req.body;
       
       if (!email) {
-        throw new APIError('Email is required', 400);
+        throw new APIError({ message: 'Email is required', status: 400 });
       }
       
       // Validate company email domain
       if (!AuthService.validateCompanyEmail(email)) {
-        throw new APIError('Only @vutto.in email addresses are allowed', 403);
+        throw new APIError({ message: 'Only @vutto.in email addresses are allowed', status: 403 });
       }
       
       // Create or update user
@@ -102,7 +102,7 @@ class AuthController {
       console.error('Company login error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
@@ -125,7 +125,7 @@ class AuthController {
       const user = req.user; // Set by auth middleware
       
       if (!user) {
-        throw new APIError('User not authenticated', 401);
+        throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
       res.status(200).json({
@@ -145,7 +145,7 @@ class AuthController {
       console.error('Get profile error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
@@ -193,7 +193,7 @@ class AuthController {
       
       // Check if user has admin permission
       if (!AuthService.hasPermission(user, 'user_management', 'write')) {
-        throw new APIError('Insufficient permissions to initialize RBAC', 403);
+        throw new APIError({ message: 'Insufficient permissions to initialize RBAC', status: 403 });
       }
       
       // Initialize RBAC system
@@ -209,7 +209,7 @@ class AuthController {
       console.error('Initialize RBAC error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
@@ -233,11 +233,11 @@ class AuthController {
       const { resource, action } = req.params;
       
       if (!user) {
-        throw new APIError('User not authenticated', 401);
+        throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
       if (!resource || !action) {
-        throw new APIError('Resource and action are required', 400);
+        throw new APIError({ message: 'Resource and action are required', status: 400 });
       }
       
       const hasPermission = AuthService.hasPermission(user, resource, action);
@@ -260,7 +260,7 @@ class AuthController {
       console.error('Check permission error:', error);
       
       if (error instanceof APIError) {
-        res.status(error.statusCode).json({
+        res.status(error.status).json({
           success: false,
           message: error.message
         });
