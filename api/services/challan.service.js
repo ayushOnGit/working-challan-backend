@@ -1855,11 +1855,37 @@ exports.calculateUniqueChallans = async (challanId) => {
         if (extractedAmount) {
           console.log(`💰 VCourt Notice amount extracted: ₹${extractedAmount} for challan ${challan.challanNo || challan.challanNumber || challan.noticeNo}`);
         }
+        
+        // 🎯 FIXED: Extract date for VCourt Notice challans
+        let extractedDate = null;
+        if (challan.detailedInfo?.caseDetails) {
+          // Try to extract date from case details
+          extractedDate = challan.detailedInfo.caseDetails['Challan Date.'] || 
+                         challan.detailedInfo.caseDetails['Challan Date'] || 
+                         challan.detailedInfo.caseDetails['Notice Date'] || 
+                         challan.detailedInfo.caseDetails['Issue Date'] || 
+                         challan.detailedInfo.caseDetails['Registration Date'] || 
+                         challan.detailedInfo.caseDetails['Date'];
+        }
+        
+        // Fallback to direct fields if detailedInfo is not available
+        if (!extractedDate && challan.detailedInfo) {
+          extractedDate = challan.detailedInfo.challanDate || 
+                         challan.detailedInfo.noticeDate || 
+                         challan.detailedInfo.issueDate || 
+                         challan.detailedInfo.date;
+        }
+        
+        if (extractedDate) {
+          console.log(`📅 VCourt Notice date extracted: ${extractedDate} for challan ${challan.challanNo || challan.challanNumber || challan.noticeNo}`);
+        }
+        
         allChallans.push({
           ...challan,
           source: 'vcourt_notice',
           priority: 1,
-          amount: extractedAmount || challan.amount // Use extracted amount or fallback to existing
+          amount: extractedAmount || challan.amount, // Use extracted amount or fallback to existing
+          date: extractedDate // 🎯 FIXED: Add extracted date
         });
       });
     }
@@ -1872,11 +1898,37 @@ exports.calculateUniqueChallans = async (challanId) => {
         if (extractedAmount) {
           console.log(`💰 VCourt Traffic amount extracted: ₹${extractedAmount} for challan ${challan.challanNo || challan.challanNumber || challan.noticeNo}`);
         }
+        
+        // 🎯 FIXED: Extract date for VCourt Traffic challans
+        let extractedDate = null;
+        if (challan.detailedInfo?.caseDetails) {
+          // Try to extract date from case details
+          extractedDate = challan.detailedInfo.caseDetails['Challan Date.'] || 
+                         challan.detailedInfo.caseDetails['Challan Date'] || 
+                         challan.detailedInfo.caseDetails['Notice Date'] || 
+                         challan.detailedInfo.caseDetails['Issue Date'] || 
+                         challan.detailedInfo.caseDetails['Registration Date'] || 
+                         challan.detailedInfo.caseDetails['Date'];
+        }
+        
+        // Fallback to direct fields if detailedInfo is not available
+        if (!extractedDate && challan.detailedInfo) {
+          extractedDate = challan.detailedInfo.challanDate || 
+                         challan.detailedInfo.noticeDate || 
+                         challan.detailedInfo.issueDate || 
+                         challan.detailedInfo.date;
+        }
+        
+        if (extractedDate) {
+          console.log(`📅 VCourt Traffic date extracted: ${extractedDate} for challan ${challan.challanNo || challan.challanNumber || challan.noticeNo}`);
+        }
+        
         allChallans.push({
           ...challan,
           source: 'vcourt_traffic',
           priority: 2,
-          amount: extractedAmount || challan.amount // Use extracted amount or fallback to existing
+          amount: extractedAmount || challan.amount, // Use extracted amount or fallback to existing
+          date: extractedDate // 🎯 FIXED: Add extracted date
         });
       });
     }
@@ -1889,11 +1941,20 @@ exports.calculateUniqueChallans = async (challanId) => {
         if (extractedAmount) {
           console.log(`💰 Delhi Police amount extracted: ₹${extractedAmount} for challan ${challan.noticeNo || challan.challanNo}`);
         }
+        
+        // 🎯 FIXED: Extract date for Delhi Police challans
+        let extractedDate = challan.offenceDateTime || challan.offenceDate || challan.dateTime || challan.date || challan.challanDate || challan.noticeDate || challan.issueDate || challan.createdDate;
+        
+        if (extractedDate) {
+          console.log(`📅 Delhi Police date extracted: ${extractedDate} for challan ${challan.noticeNo || challan.challanNo}`);
+        }
+        
         allChallans.push({
           ...challan,
           source: 'traffic_notice',
           priority: 3,
-          amount: extractedAmount || challan.penaltyAmount || challan.amount // Use extracted amount or fallback to penaltyAmount
+          amount: extractedAmount || challan.penaltyAmount || challan.amount, // Use extracted amount or fallback to penaltyAmount
+          date: extractedDate // 🎯 FIXED: Add extracted date
         });
       });
     }
@@ -1901,10 +1962,18 @@ exports.calculateUniqueChallans = async (challanId) => {
     // From CarInfo (Priority 4 - Lowest)
     if (challanRecord.acko_json && Array.isArray(challanRecord.acko_json)) {
       challanRecord.acko_json.forEach(challan => {
+        // 🎯 FIXED: Extract date for CarInfo challans
+        let extractedDate = challan.dateTime || challan.date || challan.challanDate || challan.noticeDate || challan.issueDate || challan.createdDate;
+        
+        if (extractedDate) {
+          console.log(`📅 CarInfo date extracted: ${extractedDate} for challan ${challan.challanNo || challan.challanNumber || challan.noticeNo}`);
+        }
+        
         allChallans.push({
           ...challan,
           source: 'acko',
-          priority: 4
+          priority: 4,
+          date: extractedDate // 🎯 FIXED: Add extracted date
         });
       });
     }
@@ -2127,6 +2196,3 @@ exports.saveUniqueChallans = async (challanId, uniqueChallans) => {
     return false;
   }
 };
-
-
-
