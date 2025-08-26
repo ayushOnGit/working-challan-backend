@@ -506,7 +506,15 @@ class AuthService {
       const users = await prisma.company_users.findMany({
         where: { is_active: true },
         include: {
-          role: true,
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true
+                }
+              }
+            }
+          },
           user_permissions: {
             include: {
               permission: true
