@@ -460,13 +460,11 @@ model company_user_permissions {
   user_id       Int
   permission_id Int
   granted       Boolean   @default(true)
-  granted_by    Int?      // Admin who granted this permission
   granted_at    DateTime  @default(now()) @db.Timestamptz(6)
   
   // Relations
   user         company_users      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   permission   company_permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
-  granted_by_user company_users?  @relation("UserPermissions", fields: [granted_by], references: [id])
   
   @@unique([user_id, permission_id])
   @@index([user_id])
