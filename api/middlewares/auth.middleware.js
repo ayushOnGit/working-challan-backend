@@ -26,8 +26,11 @@ const authenticateToken = async (req, res, next) => {
       throw new APIError({ message: 'User not found or inactive', status: 401 });
     }
     
-    // Add user info to request
-    req.user = {
+    // Store full user object for permission checks
+    req.user = user;
+    
+    // Also store simplified user info for backward compatibility
+    req.userInfo = {
       id: user.id,
       email: user.email,
       name: user.name,
@@ -154,7 +157,11 @@ const optionalAuth = async (req, res, next) => {
         const user = await AuthService.authenticateCompanyUser(decoded.email);
         
         if (user) {
-          req.user = {
+          // Store full user object for permission checks
+          req.user = user;
+          
+          // Also store simplified user info for backward compatibility
+          req.userInfo = {
             id: user.id,
             email: user.email,
             name: user.name,
