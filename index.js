@@ -10,6 +10,12 @@ const initializeRBACOnStartup = async () => {
     const AuthService = require('./api/services/auth.service');
     await AuthService.initializeRBAC();
     console.log('✅ RBAC system initialized successfully on startup');
+    
+    // Ensure default admin user exists
+    console.log('🔧 Ensuring default admin user exists...');
+    await AuthService.ensureDefaultAdmin();
+    console.log('✅ Default admin user ensured');
+    
   } catch (error) {
     console.error('❌ Failed to initialize RBAC on startup:', error.message);
     // Don't crash the server, just log the error

@@ -463,6 +463,244 @@ class AuthService {
       throw error;
     }
   }
+
+  /**
+   * Make a specific user admin (for initial setup)
+   * @param {string} email - User email
+   * @returns {Object} - Updated user
+   */
+  async makeUserAdmin(email) {
+    try {
+      console.log(`🔧 Making user ${email} admin...`);
+      
+      // Get admin role
+      const adminRole = await prisma.company_roles.findFirst({
+        where: { name: 'admin' }
+      });
+      
+      if (!adminRole) {
+        throw new Error('Admin role not found. Please run initializeRBAC first.');
+      }
+      
+      // Update user to admin
+      const updatedUser = await prisma.company_users.update({
+        where: { email: email.toLowerCase() },
+        data: { role_id: adminRole.id }
+      });
+      
+      console.log(`✅ User ${email} is now admin`);
+      return updatedUser;
+      
+    } catch (error) {
+      console.error(`❌ Error making user admin:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all users with their roles and permissions
+   * @returns {Array} - List of users with role and permission details
+   */
+  async getAllUsers() {
+    try {
+      const users = await prisma.company_users.findMany({
+        where: { is_active: true },
+        include: {
+          role: true,
+          user_permissions: {
+            include: {
+              permission: true
+            }
+          }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+
+      // Format user data with permissions
+      return users.map(user => ({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        last_login: user.last_login,
+        created_at: user.created_at,
+        permissions: this.extractPermissions(user)
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching users:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all available roles
+   * @returns {Array} - List of roles
+   */
+  async getAllRoles() {
+    try {
+      return await prisma.company_roles.findMany({
+        where: { is_active: true },
+        orderBy: { name: 'asc' }
+      });
+    } catch (error) {
+      console.error('❌ Error fetching roles:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all available permissions
+   * @returns {Array} - List of permissions
+   */
+  async getAllPermissions() {
+    try {
+      return await prisma.company_permissions.findMany({
+        where: { is_active: true },
+        orderBy: [{ resource: 'asc' }, { action: 'asc' }]
+      });
+    } catch (error) {
+      console.error('❌ Error fetching permissions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user role
+   * @param {number} userId - User ID
+   * @param {number} roleId - New role ID
+   * @returns {Object} - Updated user
+   */
+  async updateUserRole(userId, roleId) {
+    try {
+      const updatedUser = await prisma.company_users.update({
+        where: { id: userId },
+        data: { role_id: roleId },
+        include: {
+          role: true
+        }
+      });
+
+      console.log(`✅ User ${updatedUser.email} role updated to ${updatedUser.role.name}`);
+      return updatedUser;
+    } catch (error) {
+      console.error('❌ Error updating user role:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Grant permission to user
+   * @param {number} userId - User ID
+   * @param {number} permissionId - Permission ID
+   * @returns {Object} - Created permission
+   */
+  async grantUserPermission(userId, permissionId) {
+    try {
+      const userPermission = await prisma.company_user_permissions.upsert({
+        where: {
+          user_id_permission_id: {
+            user_id: userId,
+            permission_id: permissionId
+          }
+        },
+        update: {
+          granted: true,
+          granted_at: new Date()
+        },
+        create: {
+          user_id: userId,
+          permission_id: permissionId,
+          granted: true
+        }
+      });
+
+      console.log(`✅ Permission granted to user ${userId}`);
+      return userPermission;
+    } catch (error) {
+      console.error('❌ Error granting permission:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Revoke permission from user
+   * @param {number} userId - User ID
+   * @param {number} permissionId - Permission ID
+   * @returns {Object} - Updated permission
+   */
+  async revokeUserPermission(userId, permissionId) {
+    try {
+      const userPermission = await prisma.company_user_permissions.update({
+        where: {
+          user_id_permission_id: {
+            user_id: userId,
+            permission_id: permissionId
+          }
+        },
+        data: {
+          granted: false,
+          granted_at: new Date()
+        }
+      });
+
+      console.log(`✅ Permission revoked from user ${userId}`);
+      return userPermission;
+    } catch (error) {
+      console.error('❌ Error revoking permission:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ensure default admin user exists with full permissions
+   * @returns {Object} - Admin user
+   */
+  async ensureDefaultAdmin() {
+    try {
+      const adminEmail = 'ayush.singh@vutto.in';
+      
+      // Check if admin user exists
+      let adminUser = await prisma.company_users.findFirst({
+        where: { email: adminEmail }
+      });
+
+      if (!adminUser) {
+        // Create admin user if doesn't exist
+        const adminRole = await prisma.company_roles.findFirst({
+          where: { name: 'admin' }
+        });
+
+        if (!adminRole) {
+          throw new Error('Admin role not found. Please run initializeRBAC first.');
+        }
+
+        adminUser = await prisma.company_users.create({
+          data: {
+            email: adminEmail,
+            name: 'Ayush Singh',
+            role_id: adminRole.id
+          }
+        });
+
+        console.log(`✅ Created admin user: ${adminEmail}`);
+      } else {
+        // Ensure existing user has admin role
+        const adminRole = await prisma.company_roles.findFirst({
+          where: { name: 'admin' }
+        });
+
+        if (adminUser.role_id !== adminRole.id) {
+          adminUser = await this.updateUserRole(adminUser.id, adminRole.id);
+          console.log(`✅ Updated user ${adminEmail} to admin role`);
+        }
+      }
+
+      return adminUser;
+    } catch (error) {
+      console.error('❌ Error ensuring default admin:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new AuthService();

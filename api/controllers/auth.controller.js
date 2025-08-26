@@ -272,6 +272,252 @@ class AuthController {
       }
     }
   }
+
+  /**
+   * Make a specific user admin (for initial setup)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async makeAdmin(req, res) {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        throw new APIError({ message: 'Email is required', status: 400 });
+      }
+      
+      // Make the user admin
+      const result = await AuthService.makeUserAdmin(email);
+      
+      res.status(200).json({
+        success: true,
+        message: `User ${email} is now admin`,
+        data: result
+      });
+      
+    } catch (error) {
+      console.error('Make admin error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.status).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+    }
+  }
+
+  /**
+   * Get all users with roles and permissions
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async getAllUsers(req, res) {
+    try {
+      const users = await AuthService.getAllUsers();
+      
+      res.status(200).json({
+        success: true,
+        data: users
+      });
+      
+    } catch (error) {
+      console.error('Get all users error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Get all available roles
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async getAllRoles(req, res) {
+    try {
+      const roles = await AuthService.getAllRoles();
+      
+      res.status(200).json({
+        success: true,
+        data: roles
+      });
+      
+    } catch (error) {
+      console.error('Get all roles error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Get all available permissions
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async getAllPermissions(req, res) {
+    try {
+      const permissions = await AuthService.getAllPermissions();
+      
+      res.status(200).json({
+        success: true,
+        data: permissions
+      });
+      
+    } catch (error) {
+      console.error('Get all permissions error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Update user role
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async updateUserRole(req, res) {
+    try {
+      const { userId, roleId } = req.body;
+      
+      if (!userId || !roleId) {
+        throw new APIError({ message: 'User ID and Role ID are required', status: 400 });
+      }
+      
+      const updatedUser = await AuthService.updateUserRole(parseInt(userId), parseInt(roleId));
+      
+      res.status(200).json({
+        success: true,
+        message: `User role updated successfully`,
+        data: updatedUser
+      });
+      
+    } catch (error) {
+      console.error('Update user role error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.status).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+    }
+  }
+
+  /**
+   * Grant permission to user
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async grantUserPermission(req, res) {
+    try {
+      const { userId, permissionId } = req.body;
+      
+      if (!userId || !permissionId) {
+        throw new APIError({ message: 'User ID and Permission ID are required', status: 400 });
+      }
+      
+      const result = await AuthService.grantUserPermission(parseInt(userId), parseInt(permissionId));
+      
+      res.status(200).json({
+        success: true,
+        message: `Permission granted successfully`,
+        data: result
+      });
+      
+    } catch (error) {
+      console.error('Grant permission error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.status).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+    }
+  }
+
+  /**
+   * Revoke permission from user
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async revokeUserPermission(req, res) {
+    try {
+      const { userId, permissionId } = req.body;
+      
+      if (!userId || !permissionId) {
+        throw new APIError({ message: 'User ID and Permission ID are required', status: 400 });
+      }
+      
+      const result = await AuthService.revokeUserPermission(parseInt(userId), parseInt(permissionId));
+      
+      res.status(200).json({
+        success: true,
+        message: `Permission revoked successfully`,
+        data: result
+      });
+      
+    } catch (error) {
+      console.error('Revoke permission error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.status).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+    }
+  }
+
+  /**
+   * Ensure default admin user exists
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async ensureDefaultAdmin(req, res) {
+    try {
+      const adminUser = await AuthService.ensureDefaultAdmin();
+      
+      res.status(200).json({
+        success: true,
+        message: `Default admin user ensured`,
+        data: adminUser
+      });
+      
+    } catch (error) {
+      console.error('Ensure default admin error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();
