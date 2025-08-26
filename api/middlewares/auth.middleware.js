@@ -3,9 +3,6 @@ const APIError = require('../utils/APIError');
 
 /**
  * Authentication middleware to verify JWT token
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
 const authenticateToken = async (req, res, next) => {
   try {
@@ -19,17 +16,15 @@ const authenticateToken = async (req, res, next) => {
     // Verify token
     const decoded = AuthService.verifyToken(token);
     
-    // Get fresh user data from database
+    // Get fresh user data from database with full relations
     const user = await AuthService.authenticateCompanyUser(decoded.email);
     
     if (!user) {
       throw new APIError({ message: 'User not found or inactive', status: 401 });
     }
     
-    // Store full user object for permission checks
-    req.user = user;
-    
-    // Also store simplified user info for backward compatibility
+    // Add FULL user info to request (needed for permission checks)
+    req.user = user; // Full user object with relations
     req.userInfo = {
       id: user.id,
       email: user.email,
@@ -58,24 +53,76 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
- * Permission middleware to check if user has access to specific resource/action
- * @param {string} resource - Resource to check access for
- * @param {string} action - Action to check access for
- * @returns {Function} - Express middleware function
+ * Permission middleware - FIXED VERSION
  */
 const requirePermission = (resource, action) => {
   return (req, res, next) => {
     try {
-      const user = req.user;
+      const user = req.user; // Full user object
       
       if (!user) {
         throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
+      // Use the AuthService method with full user object
       const hasPermission = AuthService.hasPermission(user, resource, action);
       
       if (!hasPermission) {
-        throw new APIError({ message: `Insufficient permissions. Required: ${resource}:${action}`, status: 403 });
+        // Log for debugging
+        console.log(`Permission denied for user ${user.email}: ${resource}:${action}`);
+        console.log('User permissions:', AuthService.extractPermissions(user));
+        
+        throw new APIError({ 
+          message: `Insufficient permissions. Required: ${resource}:${action}`, 
+          status: 403 
+        });
+      }
+      
+      next();
+      
+    } catch (error) {
+      console.error('Permission check error:', error);
+      
+      if (error instanceof APIError) {
+        res.status(error.status).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+    }
+  };
+};
+
+/**
+ * Alternative: Simple permission check using extracted permissions
+ */
+const requirePermissionSimple = (resource, action) => {
+  return (req, res, next) => {
+    try {
+      const userInfo = req.userInfo; // Simplified user info
+      
+      if (!userInfo) {
+        throw new APIError({ message: 'User not authenticated', status: 401 });
+      }
+      
+      // Check permissions directly from extracted array
+      const hasPermission = userInfo.permissions.some(p => 
+        p.resource === resource && p.action === action
+      );
+      
+      if (!hasPermission) {
+        console.log(`Permission denied for user ${userInfo.email}: ${resource}:${action}`);
+        console.log('User permissions:', userInfo.permissions);
+        
+        throw new APIError({ 
+          message: `Insufficient permissions. Required: ${resource}:${action}`, 
+          status: 403 
+        });
       }
       
       next();
@@ -100,15 +147,13 @@ const requirePermission = (resource, action) => {
 
 /**
  * Role-based access control middleware
- * @param {Array} allowedRoles - Array of allowed role names
- * @returns {Function} - Express middleware function
  */
 const requireRole = (allowedRoles) => {
   return (req, res, next) => {
     try {
-      const user = req.user;
+      const userInfo = req.userInfo;
       
-      if (!user) {
+      if (!userInfo) {
         throw new APIError({ message: 'User not authenticated', status: 401 });
       }
       
@@ -116,8 +161,11 @@ const requireRole = (allowedRoles) => {
         allowedRoles = [allowedRoles];
       }
       
-      if (!allowedRoles.includes(user.role)) {
-        throw new APIError({ message: `Access denied. Required roles: ${allowedRoles.join(', ')}`, status: 403 });
+      if (!allowedRoles.includes(userInfo.role)) {
+        throw new APIError({ 
+          message: `Access denied. Required roles: ${allowedRoles.join(', ')}`, 
+          status: 403 
+        });
       }
       
       next();
@@ -141,10 +189,7 @@ const requireRole = (allowedRoles) => {
 };
 
 /**
- * Optional authentication middleware (doesn't fail if no token)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
+ * Optional authentication middleware
  */
 const optionalAuth = async (req, res, next) => {
   try {
@@ -157,10 +202,7 @@ const optionalAuth = async (req, res, next) => {
         const user = await AuthService.authenticateCompanyUser(decoded.email);
         
         if (user) {
-          // Store full user object for permission checks
           req.user = user;
-          
-          // Also store simplified user info for backward compatibility
           req.userInfo = {
             id: user.id,
             email: user.email,
@@ -170,7 +212,6 @@ const optionalAuth = async (req, res, next) => {
           };
         }
       } catch (error) {
-        // Token is invalid, but we don't fail the request
         console.log('Optional auth: Invalid token, continuing without user');
       }
     }
@@ -178,7 +219,6 @@ const optionalAuth = async (req, res, next) => {
     next();
     
   } catch (error) {
-    // Continue without authentication
     next();
   }
 };
@@ -186,6 +226,7 @@ const optionalAuth = async (req, res, next) => {
 module.exports = {
   authenticateToken,
   requirePermission,
+  requirePermissionSimple, // Use this if the main one doesn't work
   requireRole,
   optionalAuth
 };
