@@ -422,14 +422,14 @@ class AuthService {
       // Assign permissions to roles
       const rolePermissions = {
         admin: Object.values(createdPermissions).map(p => p.id), // All permissions
+        
         manager: [
           'settlement_config_read', 'settlement_config_write',
-          'challan_dashboard_read', 'challan_dashboard_write',
-          'user_management_read'
+          'challan_dashboard_read', 'challan_dashboard_write'
         ].map(name => createdPermissions[name]?.id).filter(Boolean),
+        
         employee: [
-          'settlement_config_read',
-          'challan_dashboard_read'
+          'challan_dashboard_read', 'challan_dashboard_write' // Can read AND manage challan data
         ].map(name => createdPermissions[name]?.id).filter(Boolean)
       };
       
