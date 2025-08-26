@@ -429,7 +429,7 @@ class AuthService {
         ].map(name => createdPermissions[name]?.id).filter(Boolean),
         
         employee: [
-          'challan_dashboard_read', 'challan_dashboard_write' // Can read AND manage challan data
+          'challan_dashboard_read' // ONLY read access - cannot modify challan data
         ].map(name => createdPermissions[name]?.id).filter(Boolean)
       };
       

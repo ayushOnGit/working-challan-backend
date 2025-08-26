@@ -23,7 +23,7 @@ async function updateRBACPermissions() {
     console.log('\n🎯 Access Summary:');
     console.log('👑 Admin: Full system access (all permissions)');
     console.log('👔 Manager: Settlement config + Challan database (read/write)');
-    console.log('👷 Employee: Challan database only (read/write)');
+    console.log('👷 Employee: Challan database only (read access)');
     
   } catch (error) {
     console.error('❌ Failed to update RBAC:', error);
